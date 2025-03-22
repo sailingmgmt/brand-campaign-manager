@@ -1,4 +1,4 @@
-const { Client, GatewayIntentBits, Events, Collection } = require('discord.js');
+const { Client, GatewayIntentBits, Events, Collection, REST, Routes } = require('discord.js');
 const fs = require('fs');
 const path = require('path');
 require('dotenv').config();
@@ -16,6 +16,7 @@ const client = new Client({
 client.commands = new Collection();
 
 // Command handler setup
+const commands = [];
 const commandsPath = path.join(__dirname, 'commands');
 const commandFiles = fs.readdirSync(commandsPath).filter(file => file.endsWith('.js'));
 
@@ -24,12 +25,28 @@ for (const file of commandFiles) {
     const command = require(filePath);
     if ('data' in command && 'execute' in command) {
         client.commands.set(command.data.name, command);
+        commands.push(command.data.toJSON());
     }
 }
 
 // When the client is ready, run this code (only once)
-client.once(Events.ClientReady, readyClient => {
+client.once(Events.ClientReady, async readyClient => {
     console.log(`Ready! Logged in as ${readyClient.user.tag}`);
+    
+    // Register commands
+    try {
+        console.log(`Started refreshing ${commands.length} application (/) commands.`);
+
+        const rest = new REST().setToken(process.env.DISCORD_TOKEN);
+        const data = await rest.put(
+            Routes.applicationCommands(process.env.CLIENT_ID),
+            { body: commands },
+        );
+
+        console.log(`Successfully reloaded ${data.length} application (/) commands.`);
+    } catch (error) {
+        console.error('Error registering commands:', error);
+    }
 });
 
 // Handle interactions
